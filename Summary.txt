@@ -1,0 +1,73 @@
+Summary of Best Model:
+
+Data Preprocessing: 
+    Rationale: Since punctuation and hashtags and mentions can sound aggressive or 
+    feel like patterns showing sexism, minimal preprocessing was done to keep
+    the original features. URLs were removed as they are unknown unless we went in the site and checked
+    
+    Steps:
+    - Lowercase to keep things consistant 
+    - took out URLs 
+    - Whitespace normalization 
+
+Feature Engineering: 
+    We combined three feature types to capture different patterns of sexism:
+    
+    1. TF-IDF (1800 features): 
+       - Captures word importance via inverse document frequency
+       - Bigrams (1,2) to capture common sexist phrases 
+       - Chi-squared feature choosing to keep most discriminative terms
+       - min_df=3: this means a word must appear in 3 documents to be counted, ignors tpyos and such
+       - max_df=0.85: removes overly common words that don't indicate anything
+       - sublinear_tf=True: log scaling keeps extremely common words from dominating
+    
+    2. GloVe embeddings (100 features): 
+       - makes synonyms match in importance as vectors
+       - Mean pooling combines word vectors into sentence vectors
+       - Complements TF-IDF by understanding synonyms and context
+    
+    3. Custom features: 
+       features that matter a lot that the first two were missing:
+       - Derogatory word count
+       - Female pronoun to total pronoun ratio
+       - Checking for woman/women/girl/female/lady to weigh more
+       - Commanding language should/ must/ need/ have to
+       - Intensity markers, Exclamation marks 
+       - Negative descriptors, Insulting adjectives 
+       - Text length as a feature, scaled logorithmically
+    
+    Final feature vector: 1907 dimensions 
+
+Model Selection and Architecture: 
+    Ensemble approach (merging several models) to reduce overfitting and make generalization better:
+    
+    - Base model: Logistic Regression 
+    - Ensemble: 4 models with different regularization strengths
+      * C values: {2.0, 3.0, 4.0, 5.0} for diversity in decisions
+      * Lower C = stronger regularization so less overfitting
+      * Higher C = weaker regularization so more nuance 
+    - Average probability predictions 
+    - Class weight {0: 1, 1: 1.5}: Penalizes misclassifying sexist examples more
+
+Training and Validation: 
+    - Stratified 5-fold cross-validation 
+    - Cross-validation during hyperparameter search prevented overfitting
+    - Threshold optimization: Tested 0.40-0.65 to find best threshold,
+      * a higher threshold meant that it would be more lax on deciding on sexist
+
+Evaluation and Results:
+
+              precision    recall  f1-score   support
+
+   not sexist     0.8727    0.9037    0.8879       789
+       sexist     0.7175    0.6498    0.6820       297
+
+     accuracy                         0.8343      1086
+    macro avg     0.7951    0.7768    0.7849      1086
+ weighted avg     0.8303    0.8343    0.8316      1086
+    
+    Confusion Matrix:
+    - True Positives : 193 correctly sexist
+    - False Negatives: 104 sexist examples missed 
+    - False Positives: 76 non-sexist flagged as sexist 
+    - True Negatives: 713 non-sexist correct
